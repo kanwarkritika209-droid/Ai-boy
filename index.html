@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login & Signup with Firebase</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            background-color: #f0f0f0;
+        }
+        .container {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+            width: 300px;
+            text-align: center;
+        }
+        input {
+            width: 100%;
+            padding: 10px;
+            margin: 10px 0;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+        }
+        button {
+            width: 100%;
+            padding: 10px;
+            background-color: #007bff;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        .toggle {
+            margin-top: 10px;
+            color: #007bff;
+            cursor: pointer;
+        }
+        .page {
+            display: none;
+        }
+        .page.active {
+            display: block;
+        }
+        #error {
+            color: red;
+            font-size: 12px;
+            margin-top: 5px;
+        }
+    </style>
+</head>
+<body>
+    <!-- Login Page -->
+    <div id="login-page" class="page active container">
+        <h2>Login</h2>
+        <input type="email" id="login-email" placeholder="Gmail" required>
+        <input type="password" id="login-password" placeholder="Password" required>
+        <button onclick="login()">Login</button>
+        <p id="login-error" class="error"></p>
+        <p class="toggle" onclick="showPage('signup-page')">Don't have an account? Sign Up</p>
+    </div>
+
+    <!-- Signup Page -->
+    <div id="signup-page" class="page container">
+        <h2>Sign Up</h2>
+        <input type="text" id="signup-username" placeholder="Username" required>
+        <input type="email" id="signup-email" placeholder="Gmail" required>
+        <input type="password" id="signup-password" placeholder="Password" required>
+        <button onclick="signup()">Sign Up</button>
+        <p id="signup-error" class="error"></p>
+        <p class="toggle" onclick="showPage('login-page')">Already have an account? Login</p>
+    </div>
+
+    <!-- Firebase SDK -->
+    <script type="module">
+        // Import Firebase modules
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js";
+        import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, updateProfile } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js";
+
+        // Your Firebase configuration
+        const firebaseConfig = {
+  apiKey: "AIzaSyDnqnb2mtQGCrFbd7vMaJqqCDrT-4fCnN4",
+  authDomain: "admid-5e6b8.firebaseapp.com",
+  databaseURL: "https://admid-5e6b8-default-rtdb.firebaseio.com",
+  projectId: "admid-5e6b8",
+  storageBucket: "admid-5e6b8.firebasestorage.app",
+  messagingSenderId: "28183170815",
+  appId: "1:28183170815:web:125bc435a99ee5b17446ca",
+  measurementId: "G-JJJ5SRRC3R"
+};
+
+        // Initialize Firebase
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+
+        // Show specific page
+        window.showPage = function(pageId) {
+            document.querySelectorAll('.page').forEach(page => page.classList.remove('active'));
+            document.getElementById(pageId).classList.add('active');
+        }
+
+        // Signup function
+        window.signup = async function() {
+            const username = document.getElementById('signup-username').value;
+            const email = document.getElementById('signup-email').value;
+            const password = document.getElementById('signup-password').value;
+            const errorElement = document.getElementById('signup-error');
+
+            try {
+                const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+                await updateProfile(userCredential.user, { displayName: username });
+                window.location.href = '1.html'; // Redirect to 1.html after signup
+            } catch (error) {
+                errorElement.textContent = error.message;
+            }
+        }
+
+        // Login function
+        window.login = async function() {
+            const email = document.getElementById('login-email').value;
+            const password = document.getElementById('login-password').value;
+            const errorElement = document.getElementById('login-error');
+
+            try {
+                await signInWithEmailAndPassword(auth, email, password);
+                window.location.href = '1.html'; // Redirect to 1.html after login
+            } catch (error) {
+                errorElement.textContent = error.message;
+            }
+        }
+
+        // Logout function
+        window.logout = async function() {
+            await signOut(auth);
+            showPage('login-page');
+        }
+
+        // Auth state listener
+        onAuthStateChanged(auth, (user) => {
+            if (user) {
+                window.location.href = '1.html'; // Redirect to 1.html if user is authenticated
+            } else {
+                showPage('login-page');
+            }
+        });
+    </script>
+</body>
+</html>

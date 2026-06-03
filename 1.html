@@ -1,0 +1,656 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mega Bot Chat App</title>
+    <!-- Preload n8n chat widget styles -->
+    <link rel="preload" href="https://cdn.jsdelivr.net/npm/@n8n/chat/dist/style.css" as="style">
+    <link href="https://cdn.jsdelivr.net/npm/@n8n/chat/dist/style.css" rel="stylesheet" defer />
+    <!-- Firebase SDK -->
+    <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            background-color: #f0f0f0;
+        }
+        .container {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+            width: 300px;
+            text-align: center;
+        }
+        input {
+            width: 100%;
+            padding: 10px;
+            margin: 10px 0;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            box-sizing: border-box;
+        }
+        button {
+            width: 100%;
+            padding: 10px;
+            background-color: #007bff;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        #google-signin-button {
+            background: #db4437;
+            margin-top: 10px;
+        }
+        #google-signin-button:hover {
+            background: #c1351d;
+        }
+        .toggle {
+            margin-top: 10px;
+            color: #007bff;
+            cursor: pointer;
+        }
+        .page {
+            display: none;
+        }
+        .page.active {
+            display: block;
+        }
+        #error, #login-error, #signup-error {
+            color: red;
+            font-size: 12px;
+            margin-top: 5px;
+        }
+        :root {
+            --chat--color-primary: #007bff;
+            --chat--color-secondary: #28a745;
+            --chat--window--width: 400px;
+            --chat--window--height: 600px;
+            --chat--font-family: 'Arial', sans-serif;
+        }
+        .chat-bubble, .chat-toggle-button {
+            display: none !important;
+        }
+        .n8n-branding, .powered-by-n8n {
+            display: none !important;
+        }
+        .chat-message code {
+            position: relative;
+            display: block;
+            background: #f5f5f5;
+            padding: 10px;
+            border-radius: 4px;
+            font-family: 'Courier New', monospace;
+        }
+        .copy-button {
+            position: absolute;
+            top: 5px;
+            right: 5px;
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 5px 10px;
+            cursor: pointer;
+            border-radius: 3px;
+            font-size: 12px;
+        }
+        .copy-button:hover {
+            background: #0056b3;
+        }
+        #start-chat-button {
+            margin-top: 20px;
+            position: relative;
+        }
+        #start-chat-button img {
+            width: 20px;
+            height: 20px;
+            vertical-align: middle;
+            margin-right: 5px;
+        }
+        #start-chat-button.locked::after {
+            content: url('https://via.placeholder.com/15x15?text=Lock');
+            position: absolute;
+            top: 50%;
+            right: 10px;
+            transform: translateY(-50%);
+        }
+        .chat-input-disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+        .hidden {
+            display: none;
+        }
+        #save-chat-button, #view-chat-button {
+            margin-top: 10px;
+            width: 48%;
+            display: inline-block;
+            vertical-align: top;
+        }
+        #save-chat-button {
+            background-color: #28a745;
+        }
+        #save-chat-button:hover {
+            background-color: #218838;
+        }
+        #view-chat-button {
+            background-color: #6c757d;
+            margin-left: 4%;
+        }
+        #view-chat-button:hover {
+            background-color: #5a6268;
+        }
+        #chat-view-modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+        }
+        #chat-view-content {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            width: 80%;
+            max-width: 600px;
+            max-height: 80vh;
+            overflow-y: auto;
+            position: relative;
+        }
+        #close-modal {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: #dc3545;
+            color: white;
+            border: none;
+            padding: 5px 10px;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        #close-modal:hover {
+            background: #c82333;
+        }
+        .saved-chat {
+            margin-bottom: 10px;
+            padding: 10px;
+            background: #f8f9fa;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        .saved-chat:hover {
+            background: #e9ecef;
+        }
+        .chat-message-view {
+            margin: 5px 0;
+            word-wrap: break-word;
+        }
+    </style>
+</head>
+<body>
+    <!-- Login Page -->
+    <div id="login-page" class="page container">
+        <h2>Login</h2>
+        <input type="email" id="login-email" placeholder="Gmail" required>
+        <input type="password" id="login-password" placeholder="Password" required>
+        <button onclick="login()">Login</button>
+        <button id="google-signin-button" onclick="googleSignIn()">Sign in with Google</button>
+        <p id="login-error" class="error"></p>
+        <p class="toggle" onclick="showPage('signup-page')">Don't have an account? Sign Up</p>
+    </div>
+
+    <!-- Signup Page -->
+    <div id="signup-page" class="page container">
+        <h2>Sign Up</h2>
+        <input type="text" id="signup-username" placeholder="Username" required>
+        <input type="email" id="signup-email" placeholder="Gmail" required>
+        <input type="password" id="signup-password" placeholder="Password" required>
+        <button onclick="signup()">Sign Up</button>
+        <button id="google-signin-button" onclick="googleSignIn()">Sign in with Google</button>
+        <p id="signup-error" class="error"></p>
+        <p class="toggle" onclick="showPage('login-page')">Already have an account? Login</p>
+    </div>
+
+    <!-- Home Page -->
+    <div id="home-page" class="page container">
+        <h2 id="welcome-message"></h2>
+        <p id="trial-status">Checking trial status...</p>
+        <button id="start-chat-button" class="hidden">
+            <img src="https://via.placeholder.com/20x20?text=Chat" alt="Chat Icon">
+            Start Chat
+        </button>
+        <button id="save-chat-button">Save Chat</button>
+        <button id="view-chat-button">View Chat</button>
+        <p id="error"></p>
+        <button onclick="logout()">Logout</button>
+    </div>
+
+    <!-- View Chat Modal -->
+    <div id="chat-view-modal">
+        <div id="chat-view-content">
+            <button id="close-modal">Close</button>
+            <h3>Saved Chats</h3>
+            <div id="saved-chats"></div>
+        </div>
+    </div>
+
+    <!-- Firebase SDK and n8n Chat -->
+    <script type="module">
+        // Import Firebase modules
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js";
+        import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signInWithPopup, GoogleAuthProvider, signOut, onAuthStateChanged, updateProfile } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js";
+        import { getFirestore, doc, setDoc, getDoc, collection, addDoc, getDocs, query, orderBy } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
+        import { createChat } from 'https://cdn.jsdelivr.net/npm/@n8n/chat/dist/chat.bundle.es.js';
+
+        // Your Firebase configuration (Replace with your actual config)
+        const firebaseConfig = {
+  apiKey: "AIzaSyDnqnb2mtQGCrFbd7vMaJqqCDrT-4fCnN4",
+  authDomain: "admid-5e6b8.firebaseapp.com",
+  databaseURL: "https://admid-5e6b8-default-rtdb.firebaseio.com",
+  projectId: "admid-5e6b8",
+  storageBucket: "admid-5e6b8.firebasestorage.app",
+  messagingSenderId: "28183170815",
+  appId: "1:28183170815:web:125bc435a99ee5b17446ca",
+  measurementId: "G-JJJ5SRRC3R"
+};
+
+        // Initialize Firebase
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+        const provider = new GoogleAuthProvider();
+
+        // Show specific page
+        window.showPage = function(pageId) {
+            document.querySelectorAll('.page').forEach(page => page.classList.remove('active'));
+            document.getElementById(pageId).classList.add('active');
+        }
+
+        // Signup function with 7-day free trial
+        window.signup = async function() {
+            const username = document.getElementById('signup-username').value.trim();
+            const email = document.getElementById('signup-email').value.trim();
+            const password = document.getElementById('signup-password').value.trim();
+            const errorElement = document.getElementById('signup-error');
+
+            if (!username || !email || !password) {
+                errorElement.textContent = 'Please fill in all fields';
+                return;
+            }
+
+            try {
+                const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+                const user = userCredential.user;
+                await updateProfile(user, { displayName: username });
+                const trialStart = new Date('2025-07-23T14:49:00+05:30'); // Current date and time: 02:49 PM IST, July 23, 2025
+                const trialEnd = new Date(trialStart);
+                trialEnd.setDate(trialStart.getDate() + 7);
+                await setDoc(doc(db, 'users', user.uid), {
+                    username: username,
+                    email: email,
+                    trialStart: trialStart.toISOString(),
+                    trialEnd: trialEnd.toISOString(),
+                    createdAt: new Date().toISOString()
+                });
+                errorElement.textContent = 'Signup successful! Your 7-day free trial has started.';
+                showPage('home-page');
+            } catch (error) {
+                errorElement.textContent = `Signup failed: ${error.message}`;
+                console.error('Signup error:', error);
+            }
+        }
+
+        // Login function
+        window.login = async function() {
+            const email = document.getElementById('login-email').value.trim();
+            const password = document.getElementById('login-password').value.trim();
+            const errorElement = document.getElementById('login-error');
+
+            if (!email || !password) {
+                errorElement.textContent = 'Please fill in email and password';
+                return;
+            }
+
+            try {
+                await signInWithEmailAndPassword(auth, email, password);
+                errorElement.textContent = 'Login successful!';
+                showPage('home-page');
+            } catch (error) {
+                errorElement.textContent = `Login failed: ${error.message}`;
+                console.error('Login error:', error);
+            }
+        }
+
+        // Google Sign-In function with 7-day free trial for new users
+        window.googleSignIn = async function() {
+            const errorElement = document.querySelector('.error');
+            try {
+                const result = await signInWithPopup(auth, provider);
+                const user = result.user;
+                const userDocRef = doc(db, 'users', user.uid);
+                const userDoc = await getDoc(userDocRef);
+                if (!userDoc.exists()) {
+                    const username = user.displayName || 'User' + Math.floor(Math.random() * 1000);
+                    const trialStart = new Date('2025-07-23T14:49:00+05:30'); // Current date and time
+                    const trialEnd = new Date(trialStart);
+                    trialEnd.setDate(trialStart.getDate() + 7);
+                    await setDoc(userDocRef, {
+                        username: username,
+                        email: user.email,
+                        trialStart: trialStart.toISOString(),
+                        trialEnd: trialEnd.toISOString(),
+                        createdAt: new Date().toISOString()
+                    });
+                    errorElement.textContent = 'Google Sign-In successful! Your 7-day free trial has started.';
+                } else {
+                    errorElement.textContent = 'Google Sign-In successful!';
+                }
+                showPage('home-page');
+            } catch (error) {
+                errorElement.textContent = `Google Sign-In failed: ${error.message}`;
+                console.error('Google Sign-In error:', error);
+            }
+        }
+
+        // Logout function
+        window.logout = async function() {
+            try {
+                await signOut(auth);
+                showPage('login-page');
+            } catch (error) {
+                document.getElementById('error').textContent = `Logout failed: ${error.message}`;
+                console.error('Logout error:', error);
+            }
+        }
+
+        // Auth state listener
+        let currentUser = null;
+        onAuthStateChanged(auth, async (user) => {
+            currentUser = user;
+            if (user) {
+                showPage('home-page');
+                document.getElementById('welcome-message').textContent = `Welcome, ${user.displayName || 'User'}!`;
+                const userDoc = await getDoc(doc(db, 'users', user.uid)).catch(err => {
+                    console.error('Error fetching user doc:', err);
+                    document.getElementById('error').textContent = 'Error loading user data.';
+                });
+                if (userDoc && userDoc.exists()) {
+                    const trialEnd = new Date(userDoc.data().trialEnd);
+                    const now = new Date('2025-07-23T14:49:00+05:30'); // Current date and time
+                    const startChatButton = document.getElementById('start-chat-button');
+                    if (now > trialEnd) {
+                        window.location.href = '2.html'; // Redirect to 2.html on expiration
+                    } else {
+                        document.getElementById('trial-status').textContent = `Your free trial ends on ${trialEnd.toLocaleDateString()}.`;
+                        startChatButton.classList.remove('hidden');
+                    }
+                }
+            } else {
+                showPage('login-page');
+            }
+        });
+
+        // n8n Chat Widget
+        const startTime = performance.now();
+        async function initChat() {
+            try {
+                const chat = await createChat({
+                    webhookUrl: 'https://ffsmp.app.n8n.cloud/webhook/d1af04a8-6668-4427-853a-cbef70fbca60/chat', // Replace with your actual Chat Trigger URL
+                    initialMessages: ['Namaste! I’m MyChatBot. Kya main aapki madad kar sakta hoon?'],
+                    i18n: {
+                        en: {
+                            title: 'grop ai no1',
+                            subtitle: '24/7 Support in English and Hindi',
+                            getStarted: 'Start Chatting',
+                            inputPlaceholder: 'Ask in English or Hindi...',
+                            send: 'Send'
+                        }
+                    },
+                    showWelcomeScreen: false,
+                    mode: 'window',
+                    position: 'bottom-right',
+                    autoOpen: false,
+                    buttonIcon: '' // Replace with your icon URL
+                });
+
+                // Start button to open chat
+                const startButton = document.getElementById('start-chat-button');
+                startButton.addEventListener('click', async () => {
+                    if (startButton.disabled) return;
+                    const chatWindow = document.querySelector('.chat-window, .chat-container');
+                    if (chatWindow) {
+                        chatWindow.style.display = 'block';
+                        startButton.style.display = 'none';
+                        const userDoc = await getDoc(doc(db, 'users', currentUser.uid)).catch(err => {
+                            console.error('Error fetching user doc for trial check:', err);
+                            document.getElementById('error').textContent = 'Error checking trial status.';
+                        });
+                        if (userDoc && userDoc.exists()) {
+                            const trialEnd = new Date(userDoc.data().trialEnd);
+                            const now = new Date('2025-07-23T14:49:00+05:30'); // Current date and time
+                            if (now > trialEnd) {
+                                const chatInput = document.querySelector('.chat-input');
+                                const sendButton = document.querySelector('.chat-send-button');
+                                if (chatInput) {
+                                    chatInput.disabled = true;
+                                    chatInput.classList.add('chat-input-disabled');
+                                }
+                                if (sendButton) {
+                                    sendButton.disabled = true;
+                                    sendButton.classList.add('chat-input-disabled');
+                                }
+                                document.getElementById('error').textContent = 'Your free trial has expired. Please subscribe.';
+                            }
+                        }
+                    } else {
+                        console.error('Chat window not found. Ensure widget is initialized.');
+                        document.getElementById('error').textContent = 'Error: Chat window not found. Check console for details.';
+                    }
+                });
+
+                // Automatically save chat on new message
+                let saveAttempt = 0;
+                const maxRetries = 5;
+                const saveObserver = new MutationObserver((mutations, obs) => {
+                    const chatContainer = document.querySelector('.chat-container');
+                    if (!chatContainer && saveAttempt < maxRetries) {
+                        saveAttempt++;
+                        console.log(`Retry ${saveAttempt} to find chat container`);
+                        return;
+                    } else if (!chatContainer) {
+                        console.error('Chat container not found after max retries');
+                        return;
+                    }
+                    if (chatContainer && currentUser) {
+                        const chatMessages = chatContainer.querySelectorAll('.chat-message');
+                        const chatHistory = Array.from(chatMessages).map(msg => ({
+                            text: msg.textContent.replace('Copy', '').trim(),
+                            timestamp: new Date().toISOString()
+                        }));
+                        addDoc(collection(db, 'users', currentUser.uid, 'chats'), {
+                            history: chatHistory,
+                            savedAt: new Date().toISOString()
+                        }).then(() => {
+                            console.log('Chat saved automatically');
+                        }).catch(err => {
+                            console.error('Error saving chat:', err);
+                            document.getElementById('error').textContent = 'Error saving chat. Check console.';
+                        });
+                    }
+                });
+                saveObserver.observe(document.body, { childList: true, subtree: true });
+
+                // Save Chat button functionality
+                const saveChatButton = document.getElementById('save-chat-button');
+                saveChatButton.addEventListener('click', async () => {
+                    const chatContainer = document.querySelector('.chat-container');
+                    if (chatContainer && currentUser) {
+                        const chatMessages = chatContainer.querySelectorAll('.chat-message');
+                        const chatHistory = Array.from(chatMessages).map(msg => ({
+                            text: msg.textContent.replace('Copy', '').trim(),
+                            timestamp: new Date().toISOString()
+                        }));
+                        await addDoc(collection(db, 'users', currentUser.uid, 'chats'), {
+                            history: chatHistory,
+                            savedAt: new Date().toISOString()
+                        });
+                        document.getElementById('error').textContent = 'Chat saved successfully!';
+                        setTimeout(() => { document.getElementById('error').textContent = ''; }, 3000);
+                    } else {
+                        document.getElementById('error').textContent = 'No chat to save or user not logged in.';
+                    }
+                });
+
+                // View Chat modal functionality
+                const viewChatButton = document.getElementById('view-chat-button');
+                const modal = document.getElementById('chat-view-modal');
+                const closeModal = document.getElementById('close-modal');
+                const savedChatsDiv = document.getElementById('saved-chats');
+
+                viewChatButton.addEventListener('click', async () => {
+                    if (currentUser) {
+                        try {
+                            const q = query(collection(db, 'users', currentUser.uid, 'chats'), orderBy('savedAt', 'desc'));
+                            const querySnapshot = await getDocs(q);
+                            savedChatsDiv.innerHTML = '';
+                            if (querySnapshot.empty) {
+                                savedChatsDiv.innerHTML = '<p>No saved chats found.</p>';
+                            } else {
+                                querySnapshot.forEach(doc => {
+                                    const chatData = doc.data();
+                                    const chatDiv = document.createElement('div');
+                                    chatDiv.className = 'saved-chat';
+                                    chatDiv.setAttribute('data-chat-id', doc.id); // Store chat ID for opening
+                                    chatDiv.innerHTML = `<h4>Saved at: ${new Date(chatData.savedAt).toLocaleString()}</h4>`;
+                                    chatData.history.forEach(msg => {
+                                        const msgDiv = document.createElement('div');
+                                        msgDiv.className = 'chat-message-view';
+                                        msgDiv.textContent = msg.text;
+                                        chatDiv.appendChild(msgDiv);
+                                    });
+                                    savedChatsDiv.appendChild(chatDiv);
+                                });
+                                modal.style.display = 'flex';
+                            }
+                        } catch (err) {
+                            console.error('Error loading saved chats:', err);
+                            document.getElementById('error').textContent = 'Error loading saved chats. Check console.';
+                        }
+                    }
+                });
+
+                // Open selected chat
+                savedChatsDiv.addEventListener('click', async (e) => {
+                    const chatDiv = e.target.closest('.saved-chat');
+                    if (chatDiv && currentUser) {
+                        const chatId = chatDiv.getAttribute('data-chat-id');
+                        if (chatId) {
+                            try {
+                                const chatDoc = await getDoc(doc(db, 'users', currentUser.uid, 'chats', chatId));
+                                if (chatDoc.exists()) {
+                                    const chatData = chatDoc.data().history;
+                                    const chatContainer = document.querySelector('.chat-container');
+                                    if (chatContainer) {
+                                        chatContainer.innerHTML = ''; // Clear existing messages
+                                        chatData.forEach(msg => {
+                                            const messageDiv = document.createElement('div');
+                                            messageDiv.className = 'chat-message';
+                                            messageDiv.textContent = msg.text;
+                                            chatContainer.appendChild(messageDiv);
+                                        });
+                                        modal.style.display = 'none'; // Close modal after opening
+                                        document.getElementById('error').textContent = 'Chat opened successfully!';
+                                        setTimeout(() => { document.getElementById('error').textContent = ''; }, 3000);
+                                    }
+                                }
+                            } catch (err) {
+                                console.error('Error opening chat:', err);
+                                document.getElementById('error').textContent = 'Error opening chat. Check console.';
+                            }
+                        }
+                    }
+                });
+
+                closeModal.addEventListener('click', () => {
+                    modal.style.display = 'none';
+                });
+
+                // Copy to clipboard with fallback
+                const copyToClipboard = async (text, button) => {
+                    if (navigator.clipboard && window.isSecureContext) {
+                        try {
+                            await navigator.clipboard.writeText(text);
+                            button.innerText = 'Copied!';
+                            setTimeout(() => { button.innerText = 'Copy'; }, 2000);
+                        } catch (err) {
+                            console.error('Clipboard API failed:', err);
+                            fallbackCopy(text, button);
+                        }
+                    } else {
+                        fallbackCopy(text, button);
+                    }
+                };
+
+                const fallbackCopy = (text, button) => {
+                    const textarea = document.createElement('textarea');
+                    textarea.value = text;
+                    document.body.appendChild(textarea);
+                    textarea.select();
+                    try {
+                        document.execCommand('copy');
+                        button.innerText = 'Copied!';
+                        setTimeout(() => { button.innerText = 'Copy'; }, 2000);
+                    } catch (err) {
+                        console.error('Fallback copy failed:', err);
+                        button.innerText = 'Copy failed';
+                    }
+                    document.body.removeChild(textarea);
+                };
+
+                // Add copy buttons to code blocks
+                const addCopyButtons = () => {
+                    const codeBlocks = document.querySelectorAll('.chat-message code');
+                    codeBlocks.forEach((block) => {
+                        if (!block.querySelector('.copy-button')) {
+                            const copyButton = document.createElement('button');
+                            copyButton.className = 'copy-button';
+                            copyButton.innerText = 'Copy';
+                            copyButton.onclick = () => copyToClipboard(block.innerText, copyButton);
+                            block.appendChild(copyButton);
+                        }
+                    });
+                };
+
+                const copyObserver = new MutationObserver(addCopyButtons);
+                const chatContainer = document.querySelector('.chat-container') || document.body;
+                copyObserver.observe(chatContainer, { childList: true, subtree: true });
+                addCopyButtons();
+
+                const endTime = performance.now();
+                console.log(`Chat widget loaded in ${(endTime - startTime).toFixed(2)}ms`);
+            } catch (error) {
+                console.error('Failed to initialize chat widget:', error);
+                document.getElementById('error').textContent = `Error: Failed to load chatbot. Details: ${error.message}`;
+            }
+        }
+
+        initChat();
+    </script>
+</body>
+</html>
